@@ -27,11 +27,11 @@ model, serial_model = models.setup_model(X_test, class_names, weights_file="pano
 model.summary()
 
 def get_confidence(model,x):
-    prediction = model.predict(np.array([x]))
+    prediction = model.predict(x)
     return(np.argmax(prediction))
 
 
-def SimBA_attack(model, x, y, iterations=10000, epsilon=0.2):
+def SimBA_attack(model, x, y, iterations=1000, epsilon=0.2):
     # get dimensions of x and flatten
     dimensions = (tf.reshape(x,[1,-1])).get_shape()
     permutations = tf.convert_to_tensor(np.random.permutation(dimensions[1]))
@@ -45,20 +45,21 @@ def SimBA_attack(model, x, y, iterations=10000, epsilon=0.2):
         perturbation = np.array(perturbation[0])
         perturbation[0] = epsilon
         perturbation = tf.convert_to_tensor(perturbation)
-        print(probability)
-        left_prob = get_confidence(model,x-perturbation)
-        exit()
-    '''
-    n_dims = x.view(1,-1).size(1)
-    perms = torch.randperm(n_dims)
-    '''
-    # generate random permutation for dimensions between -1 and 1 for dimensions of the tensor
 
-    # get probability of classification
+        left_prob = get_confidence(model,x-tf.reshape(perturbation,tf.shape(x)))
 
-    # iterate num_iters
-        # x + eq
+        if False != (left_prob < probability):
+            x = x-tf.reshape(perturbation,tf.shape(x))
+            probability = left_prob
+        else:
+            right_prob = get_confidence(model,x+tf.reshape(perturbation,tf.shape(x)))
+            if False != (right_prob < probability):
+                x = x+tf.reshape(perturbation,tf.shape(x))
+                probability = right_prob
+        if i % 10 == 0:
+            print(probability)
+    return x
 
-        # x - eq
-
-SimBA_attack(model,X_test[0],Y_test[0])
+print(SimBA_attack(model,X_test[0:1,:,:,:],Y_test[0]))
+print("FFFFFFFFF")
+print(X_test[0:1,:,:,:])
