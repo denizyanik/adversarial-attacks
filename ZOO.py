@@ -48,43 +48,71 @@ def zoo_adam_attack(x,y):
         x2.reshape(-1)[coordinate] -= h
 
         gradient = np.zeros(x.reshape(-1).shape)
-        print(gradient[coordinate])
-        gradient[coordinate] = ((x1 - x2) / (2*h))
+        x1_loss = get_loss(x1,y)
+        x2_loss = get_loss(x2,y)
+        gradient[coordinate] = (x1_loss - x2_loss / (2*h))
 
         mt = beta1 * mt + (1-beta1) * gradient
         vt = beta2 * vt + (1-beta2) * np.square(gradient)
         corr = (math.sqrt(1 - beta2 ** i)) / (1 - beta1 ** i)
 
-        m = x.reshape(-1)
+        m = perturbation.reshape(-1)
         m -= learn_rate * corr * (mt / (np.sqrt(vt) + eps))
-        x = m.reshape(x.shape)
+        perturbation = m.reshape(perturbation.shape)
+
+        x += perturbation
 
     return x
 
-#print(tf.convert_to_tensor(X_test))
-#print(tf.convert_to_tensor(X_test[0:1,:,:,:]))
 
-'''
-output = model.predict(x)
+def get_loss(x,y):
 
-true_lab = tf.one_hot(decode_class(true_lab, class_names), output.shape[-1])
-true_lab = tf.reshape(true_lab, (1, output.shape[-1]))
+    output = model.predict(x)
 
-# gets Z value of real class
-real = tf.reduce_sum((true_lab) * output, 1)
+    true_lab = tf.one_hot(decode_class(y, class_names), output.shape[-1])
+    true_lab = tf.reshape(true_lab, (1, output.shape[-1]))
 
-# gets Z values of all other classes
-# minus 10000 for real class as Z values can be negative and we don't want to choose real class as max
-other = tf.reduce_max((1-true_lab)*output - (true_lab*10000),1)
+    # gets Z value of real class
+    real = tf.reduce_sum((true_lab) * output, 1)
 
-# optimize for making real class least likely as this will be an untargeted attack
-loss = tf.maximum(0.0, tf.math.log(real + 1e-30) - tf.math.log(other + 1e-30))
+    # gets most likely other class
+    # minus 10000 for real class as Z values can be negative and we don't want to choose real class as max
+    other = tf.reduce_max((1-true_lab)*output - (true_lab*10000),1)
+
+    # optimize for making real class least likely as this will be an untargeted attack
+    loss = tf.maximum(0.0, tf.math.log(real + 1e-30) - tf.math.log(other + 1e-30))
+
+    return loss
 
 
-gradient = tf.gradients(loss,modifier)
-'''
+total = 0
+correct = 0
+r_correct = 0
 
-adversarial_example = zoo_adam_attack(X_test[0:1,:,:,:],Y_test[0])
-print(decode_class(adversarial_example,class_names))
-print(decode_class(Y_test[0],class_names))
+# test accuracy
+for i in tqdm(range(0,X_test.shape[0])):
+    r_check = model.predict(X_test[i:i + 1, :, :, :])
+    r_prediction = decode_class(r_check, class_names)
+
+    adversarial_example = zoo_adam_attack(X_test[i:i+1, :, :, :], Y_test[i])
+    adversarial_example = model.predict(adversarial_example)
+
+    real = decode_class(Y_test[i],class_names)
+    prediction = decode_class(adversarial_example,class_names)
+
+    total += 1
+
+    print(real)
+    print(prediction)
+    print((r_prediction))
+
+    if (prediction == real):
+        correct += 1
+    if (r_prediction == real):
+        r_correct += 1
+
+    print("current adversarial accuracy is "+ str((correct/total)*100) + "%")
+    print("current accuracy is "+ str((r_correct/total)*100) + "%")
+
+
 
