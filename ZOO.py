@@ -2,6 +2,7 @@ import gc
 import math
 import sys
 
+import skimage.io
 from tqdm import tqdm
 
 sys.path.insert(1, 'panotti-master/panotti')
@@ -191,11 +192,26 @@ total = 0
 correct = 0
 r_correct = 0
 
-# test single accuracy
+def scale_minmax(X, min=0.0, max=1.0):
+    X_std = (X - X.min()) / (X.max() - X.min())
+    X_scaled = X_std * (max - min) + min
+    return X_scaled
 
+def spectrogram_to_image(mels):
+    mels = np.log(mels.squeeze() + 1e-9)
+
+    img = scale_minmax(mels, 0, 255).astype(np.uint8)
+    img = np.flip(img, axis=0)
+
+    return img
+
+# test single accuracy
+'''
 for i in tqdm(range(0,X_test.shape[0])):
     test = librosa.feature.inverse.mel_to_audio(X_test[i].squeeze(), sr=44100)
-    sf.write('test.wav', test, 44100)
+    sf.write('audios/test.wav', test, 44100)
+
+    skimage.io.imsave('adv.png', spectrogram_to_image(X_test[i]))
 
     r_check = model.predict(X_test[i:i + 1, :, :, :])
     r_prediction = decode_class(r_check, class_names)
@@ -203,8 +219,10 @@ for i in tqdm(range(0,X_test.shape[0])):
     adversarial_example = zoo_adam_attack(X_test[i:i+1, :, :, :], Y_test[i])
 
     test = librosa.feature.inverse.mel_to_audio(adversarial_example.squeeze(), sr=44100)
-    sf.write('adversarial_test.wav', test, 44100)
-    exit()
+    sf.write('adversarials/adversarial_test.wav', test, 44100)
+
+    skimage.io.imsave('out.png',spectrogram_to_image(adversarial_example.squeeze()))
+
     adversarial_example = model.predict(adversarial_example)
 
     real = decode_class(Y_test[i],class_names)
@@ -219,15 +237,28 @@ for i in tqdm(range(0,X_test.shape[0])):
 
     print("current adversarial accuracy is "+ str((correct/total)*100) + "%")
     print("current accuracy is "+ str((r_correct/total)*100) + "%")
-
+    exit()
+'''
 
 
 # test batch accuracy
+
+# save wav and spectogram of initial audio
+for i in tqdm(range(0,X_test.shape[0])):
+    test = librosa.feature.inverse.mel_to_audio(X_test[i].squeeze(), sr=44100)
+    sf.write('audios/audio'+str(i)+'.wav', test, 44100)
+    skimage.io.imsave('spec/spectogram'+str(i)+'.png', spectrogram_to_image(X_test[i]))
 
 adversarials = zoo_adam_attack_batch(X_test,Y_test)
 for i in range(0,adversarials.shape[0]):
 
     adversarial_example = adversarials[i:i+1,:,:,:]
+    test = librosa.feature.inverse.mel_to_audio(adversarial_example.squeeze(), sr=44100)
+
+    # save wav and spectogram of adversarial audio
+    sf.write('adversarials/adv' + str(i) + '.wav', test, 44100)
+    skimage.io.imsave('adversarial_spec/adv_spectogram' + str(i) + '.png', spectrogram_to_image(adversarial_example))
+
     adversarial_example = model.predict(adversarial_example)
 
     real = decode_class(Y_test[i], class_names)
