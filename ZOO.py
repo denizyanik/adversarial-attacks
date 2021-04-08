@@ -5,15 +5,19 @@ import sys
 from tqdm import tqdm
 
 sys.path.insert(1, 'panotti-master/panotti')
-
+#from myutils import *
 from datautils import *
 from models import *
 import tensorflow as tf
 import numpy as np
 import timeit
+import librosa
+import soundfile as sf
 
 # get the data
 X_test, Y_test, paths_test, class_names = build_dataset(path="panotti-master/Preproc/Test/", batch_size=40)
+
+
 
 # load model
 
@@ -187,13 +191,20 @@ total = 0
 correct = 0
 r_correct = 0
 
-# test accuracy
+# test single accuracy
 
 for i in tqdm(range(0,X_test.shape[0])):
+    test = librosa.feature.inverse.mel_to_audio(X_test[i].squeeze(), sr=44100)
+    sf.write('test.wav', test, 44100)
+
     r_check = model.predict(X_test[i:i + 1, :, :, :])
     r_prediction = decode_class(r_check, class_names)
 
     adversarial_example = zoo_adam_attack(X_test[i:i+1, :, :, :], Y_test[i])
+
+    test = librosa.feature.inverse.mel_to_audio(adversarial_example.squeeze(), sr=44100)
+    sf.write('adversarial_test.wav', test, 44100)
+    exit()
     adversarial_example = model.predict(adversarial_example)
 
     real = decode_class(Y_test[i],class_names)
@@ -208,6 +219,7 @@ for i in tqdm(range(0,X_test.shape[0])):
 
     print("current adversarial accuracy is "+ str((correct/total)*100) + "%")
     print("current accuracy is "+ str((r_correct/total)*100) + "%")
+
 
 
 # test batch accuracy

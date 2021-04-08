@@ -7,6 +7,7 @@ import tensorflow as tf
 from tensorflow.python.client import device_lib
 import numpy as np
 import models
+np.set_printoptions(suppress=True)
 
 def make_serial(model, parallel=True):   # Undoes make_parallel, but keyword included in case it's called on a serial model
     if (parallel):
