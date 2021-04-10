@@ -52,7 +52,7 @@ def SimBA_attack(model, x, y, iterations=1000, epsilon=0.2):
         j = np.array(permutations[i])
 
         perturbation = np.array(perturbation[0])
-        perturbation[0] = epsilon
+        perturbation[j] = epsilon
         perturbation = tf.convert_to_tensor(perturbation)
 
         left_prob = get_confidence(model,x-tf.reshape(perturbation,tf.shape(x)),y)
@@ -65,8 +65,7 @@ def SimBA_attack(model, x, y, iterations=1000, epsilon=0.2):
             if False != (right_prob < probability):
                 x = x+tf.reshape(perturbation,tf.shape(x))
                 probability = right_prob
-        if i % 10 == 0:
-            print(probability)
+
     return x
 
 def scale_minmax(X, min=0.0, max=1.0):
