@@ -5,7 +5,9 @@ from datautils import *
 from models import *
 import tensorflow as tf
 import numpy as np
-
+import librosa
+import soundfile as sf
+import skimage.io
 
 # get the data
 X_test, Y_test, paths_test, class_names = build_dataset(path="panotti-master/Preproc/Test/", batch_size=40)
@@ -30,23 +32,35 @@ def fgsm(audio, label, model, epsilon = 0.1):
 
     gradient = tape.gradient(loss,tensor_audio)
     signed_grad = tf.sign(gradient)
-    print(audio)
-    print(audio + (epsilon * signed_grad))
-    exit()
-    return (model(audio + (epsilon * signed_grad)))
+
+    return (audio + (epsilon * signed_grad))
 
 num_predictions = X_test.shape[0]
 predictions = []
 
 
 for i in range(0,num_predictions):
-    predictions.append(fgsm(X_test[i:i+1,:,:,:],Y_test[i],model,epsilon=0.1).numpy())
+    predictions.append(model(fgsm(X_test[i:i+1,:,:,:],Y_test[i],model,epsilon=0.1)).numpy())
+
+
+def scale_minmax(X, min=0.0, max=1.0):
+    X_std = (X - X.min()) / (X.max() - X.min())
+    X_scaled = X_std * (max - min) + min
+    return X_scaled
+
+def spectrogram_to_image(mels):
+    mels = np.log(mels.squeeze() + 1e-9)
+
+    img = scale_minmax(mels, 0, 255).astype(np.uint8)
+    img = np.flip(mels, axis=0)
+
+    return img
 
 
 def test_accuracy(scores,actual,class_names,predictions):
     total = 0
     correct = 0
-    print(actual.shape[0])
+
     for i in range(predictions):
         prediction = decode_class(scores[i],class_names)
         real = decode_class(actual[i],class_names)
@@ -59,3 +73,11 @@ def test_accuracy(scores,actual,class_names,predictions):
 test_accuracy(predictions,Y_test,class_names,num_predictions)
 test_accuracy(model.predict(X_test,batch_size = 40),Y_test,class_names,num_predictions)
 
+test = librosa.feature.inverse.mel_to_audio(np.array(X_test[0].squeeze()), sr=44100)
+sf.write('fgsm/original.wav', test, 44100)
+skimage.io.imsave('fgsm/original_spectrogram.png', spectrogram_to_image(X_test[1]))
+
+test = np.array(fgsm(X_test[0:1,:,:,:],Y_test[0],model,epsilon=0.1))
+test = librosa.feature.inverse.mel_to_audio(test.squeeze(), sr=44100)
+sf.write('fgsm/adv.wav', test, 44100)
+skimage.io.imsave('fgsm/spectrogram.png', spectrogram_to_image(np.array(fgsm(X_test[0:1,:,:,:],Y_test[0],model,epsilon=0.1))))
