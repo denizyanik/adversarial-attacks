@@ -1,3 +1,4 @@
+import math
 import sys
 sys.path.insert(1, 'panotti-master/panotti')
 
@@ -8,6 +9,7 @@ import numpy as np
 import librosa
 import soundfile as sf
 import skimage.io
+from tqdm import tqdm
 
 # get the data
 X_test, Y_test, paths_test, class_names = build_dataset(path="panotti-master/Preproc/Test/", batch_size=40)
@@ -18,6 +20,16 @@ model, serial_model = models.setup_model(X_test, class_names, weights_file="pano
 model.summary()
 
 cat_loss = tf.keras.losses.CategoricalCrossentropy()
+
+def calculate_snr(audio,perturbation):
+    audio = librosa.feature.inverse.mel_to_audio(np.array(audio.squeeze()), sr=44100)
+    perturbation = librosa.feature.inverse.mel_to_audio(np.array(perturbation).squeeze(), sr=44100)
+    audio_rms = math.sqrt(np.mean(audio**2))
+    perturbation_rms = math.sqrt(np.mean(perturbation**2))
+    snr = 10 * math.log10(audio_rms/perturbation_rms)
+    print(snr)
+
+
 
 def fgsm(audio, label, model, epsilon = 0.1):
     tensor_audio = tf.convert_to_tensor(audio)
@@ -32,14 +44,14 @@ def fgsm(audio, label, model, epsilon = 0.1):
 
     gradient = tape.gradient(loss,tensor_audio)
     signed_grad = tf.sign(gradient)
-
+    calculate_snr(audio,(epsilon * signed_grad))
     return (audio + (epsilon * signed_grad))
 
 num_predictions = X_test.shape[0]
 predictions = []
 
 
-for i in range(0,num_predictions):
+for i in tqdm(range(0,num_predictions)):
     predictions.append(model(fgsm(X_test[i:i+1,:,:,:],Y_test[i],model,epsilon=0.1)).numpy())
 
 
@@ -56,7 +68,6 @@ def spectrogram_to_image(mels):
 
     return img
 
-
 def test_accuracy(scores,actual,class_names,predictions):
     total = 0
     correct = 0
@@ -70,6 +81,7 @@ def test_accuracy(scores,actual,class_names,predictions):
 
     print("accuracy is "+ str((correct/total)*100) + "%")
 
+'''
 test_accuracy(predictions,Y_test,class_names,num_predictions)
 test_accuracy(model.predict(X_test,batch_size = 40),Y_test,class_names,num_predictions)
 
@@ -81,3 +93,4 @@ test = np.array(fgsm(X_test[0:1,:,:,:],Y_test[0],model,epsilon=0.1))
 test = librosa.feature.inverse.mel_to_audio(test.squeeze(), sr=44100)
 sf.write('fgsm/adv.wav', test, 44100)
 skimage.io.imsave('fgsm/spectrogram.png', spectrogram_to_image(np.array(fgsm(X_test[0:1,:,:,:],Y_test[0],model,epsilon=0.1))))
+'''
