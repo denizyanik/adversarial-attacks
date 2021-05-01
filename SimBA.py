@@ -101,7 +101,8 @@ def spec_to_image(spec):
     canvas = FigureCanvas(fig)
     ax = fig.add_subplot(111)
     p = librosa.display.specshow(librosa.amplitude_to_db(out, ref=np.max), ax=ax, y_axis='log', x_axis='time')
-    fig.savefig('speccy.png')
+    fig.savefig('spec.png')
+    return fig
 
 # test accuracy
 
@@ -136,14 +137,54 @@ for i in tqdm(range(0,X_test.shape[0])):
 test = librosa.feature.inverse.mel_to_audio(np.array(X_test[0].squeeze()), sr=44100)
 sf.write('simba/original.wav', test, 44100)
 #imageio.imwrite('simba/original_spectrogram.png', spectrogram_to_image(X_test[0]))
-spec_to_image(test)
+fig = spec_to_image(test)
+fig.savefig('simba/original.png')
+
+copy1 = np.copy(X_test[0:1,:,:,:])
+copy2 = np.copy(X_test[0:1,:,:,:])
+copy3 = np.copy(X_test[0:1,:,:,:])
 
 check = (SimBA_attack(model,X_test[0:1,:,:,:],Y_test[0]))
 
 c = decode_class(model.predict(check),class_names)
 
+test = librosa.feature.inverse.mel_to_audio(np.array(check).squeeze(), sr=44100)
+sf.write('simba/simba-0.1.wav', test, 44100)
+#imageio.imwrite('simba/simba.png', spectrogram_to_image(np.array(check)))
+fig = spec_to_image(test)
+fig.savefig('simba/simba-0.1.png')
+
+# epsilon 0.2
+check = (SimBA_attack(model,copy1,Y_test[0],0.2))
+
+c = decode_class(model.predict(check),class_names)
 
 test = librosa.feature.inverse.mel_to_audio(np.array(check).squeeze(), sr=44100)
-sf.write('simba/simba.wav', test, 44100)
+sf.write('simba/simba-0.2.wav', test, 44100)
 #imageio.imwrite('simba/simba.png', spectrogram_to_image(np.array(check)))
-spec_to_image(test)
+fig = spec_to_image(test)
+fig.savefig('simba/simba-0.2.png')
+
+#epsilon 0.05
+
+check = (SimBA_attack(model,copy2,Y_test[0],0.05))
+
+c = decode_class(model.predict(check),class_names)
+
+test = librosa.feature.inverse.mel_to_audio(np.array(check).squeeze(), sr=44100)
+sf.write('simba/simba-0.05.wav', test, 44100)
+#imageio.imwrite('simba/simba.png', spectrogram_to_image(np.array(check)))
+fig = spec_to_image(test)
+fig.savefig('simba/simba-0.05.png')
+
+# epsilon 0.01
+
+check = (SimBA_attack(model,copy3,Y_test[0],0.01))
+
+c = decode_class(model.predict(check),class_names)
+
+test = librosa.feature.inverse.mel_to_audio(np.array(check).squeeze(), sr=44100)
+sf.write('simba/simba-0.01.wav', test, 44100)
+#imageio.imwrite('simba/simba.png', spectrogram_to_image(np.array(check)))
+fig = spec_to_image(test)
+fig.savefig('simba/simba-0.01.png')
