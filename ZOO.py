@@ -14,6 +14,9 @@ import numpy as np
 import timeit
 import librosa
 import soundfile as sf
+import matplotlib.pyplot as plt
+import librosa.display
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 # get the data
 X_test, Y_test, paths_test, class_names = build_dataset(path="panotti-master/Preproc/Test/", batch_size=40)
@@ -24,6 +27,14 @@ X_test, Y_test, paths_test, class_names = build_dataset(path="panotti-master/Pre
 
 model, serial_model = models.setup_model(X_test, class_names, weights_file="panotti-master/weights.hdf5", missing_weights_fatal=True)
 model.summary()
+snr = 0
+def calculate_snr(audio,perturbation):
+    audio = librosa.feature.inverse.mel_to_audio(np.array(audio.squeeze()), sr=44100)
+    perturbation = librosa.feature.inverse.mel_to_audio(np.array(perturbation).squeeze(), sr=44100)
+    audio_rms = math.sqrt(np.mean(audio**2))
+    perturbation_rms = math.sqrt(np.mean(perturbation**2))
+    snr = 10 * math.log10((audio_rms/perturbation_rms)*(audio_rms/perturbation_rms))
+    return snr
 
 def zoo_adam_attack_batch(xs,ys):
     batch = len(xs)
@@ -124,6 +135,7 @@ def get_loss_batch(xs,ys,batch):
 
 
 def zoo_adam_attack(x,y):
+    global snr
     #ADAM variables
     mt = 0
     vt = 0
@@ -134,8 +146,10 @@ def zoo_adam_attack(x,y):
     h = 0.0001
     batch = 1
     iterations = 1000
+    snr_pert = np.zeros([1, 96, 173, 1])
 
     perturbation = np.zeros([1, 96, 173, 1])
+    copy = np.copy(x)
 
     for i in range(1,iterations+1):
 
@@ -154,7 +168,6 @@ def zoo_adam_attack(x,y):
         x1_loss = get_loss(x1,y)
         x2_loss = get_loss(x2,y)
         gradient[coordinate] = (x1_loss - x2_loss / (2*h))
-        t_loss += gradient[coordinate]
 
         mt = beta1 * mt + (1-beta1) * gradient
         vt = beta2 * vt + (1-beta2) * np.square(gradient)
@@ -165,8 +178,10 @@ def zoo_adam_attack(x,y):
         perturbation = m.reshape(perturbation.shape)
 
         x += perturbation
+        snr_pert += perturbation
 
-
+    snr += calculate_snr(copy,snr_pert)
+    print(snr)
     return (x)
 
 
@@ -199,27 +214,37 @@ def scale_minmax(X, min=0.0, max=1.0):
     X_scaled = X_std * (max - min) + min
     return X_scaled
 
-def spectrogram_to_image(mels):
-    mels = np.log(mels.squeeze() + 1e-9)
-    img = scale_minmax(mels, 0, 255).astype(np.uint8)
-    img = np.flip(img, axis=0)
-    return img
+
+def spec_to_image(spec):
+    window_size = 1024
+    window = np.hanning(window_size)
+    stft = librosa.core.spectrum.stft(spec, n_fft=window_size, hop_length=512, window=window)
+    out = 2 * np.abs(stft) / np.sum(window)
+
+    fig = plt.figure()
+    canvas = FigureCanvas(fig)
+    ax = fig.add_subplot(111)
+    p = librosa.display.specshow(librosa.amplitude_to_db(out, ref=np.max), ax=ax, y_axis='log', x_axis='time')
+    fig.savefig('spec.png')
+    return fig
 
 # test single accuracy
 
 for i in tqdm(range(0,X_test.shape[0])):
 
+    
     test = librosa.feature.inverse.mel_to_audio(X_test[i].squeeze(), sr=44100)
-    sf.write('zoo/original.wav', test, 44100)
-    skimage.io.imsave('zoo/original.png', spectrogram_to_image(X_test[i]))
-
+    sf.write('zoo/original'+str(i)+'.wav', test, 44100)
+    fig = spec_to_image(test)
+    fig.savefig('zoo/original-'+str(i)+'.png')
     r_check = model.predict(X_test[i:i + 1, :, :, :])
     r_prediction = decode_class(r_check, class_names)
 
     adversarial_example = zoo_adam_attack(X_test[i:i+1, :, :, :], Y_test[i])
-    #test = librosa.feature.inverse.mel_to_audio(np.array(adversarial_example).squeeze(), sr=44100)
-    #sf.write('zoo/ZOO.wav', test, 44100)
-    #skimage.io.imsave('zoo/ZOO.png',spectrogram_to_image(adversarial_example.squeeze()))
+    test = librosa.feature.inverse.mel_to_audio(np.array(adversarial_example).squeeze(), sr=44100)
+    sf.write('zoo/adv-'+str(i)+'.wav', test, 44100)
+    fig = spec_to_image(test)
+    fig.savefig('zoo/adv-' + str(i) + '.png')
 
     adversarial_example = model.predict(adversarial_example)
 
@@ -235,13 +260,16 @@ for i in tqdm(range(0,X_test.shape[0])):
 
     print("current adversarial accuracy is "+ str((correct/total)*100) + "%")
     print("current accuracy is "+ str((r_correct/total)*100) + "%")
-    exit()
+    if i == 3:
+        exit()
 
 
 
 # test batch accuracy
 
+copy = np.copy(X_test)
 adversarials = zoo_adam_attack_batch(X_test,Y_test)
+l2_norm = 0
 for i in range(0,adversarials.shape[0]):
 
     adversarial_example = adversarials[i:i+1,:,:,:]
@@ -255,13 +283,6 @@ for i in range(0,adversarials.shape[0]):
     if (prediction == real):
         correct += 1
 
+    l2_norm += np.linalg.norm(np.array(adversarial_example - copy[i:i + 1, :, :, :]))
     print("current adversarial accuracy is " + str((correct / total) * 100) + "%")
-
-
-# mean squared error
-# librosa - fourier transform
-# total accuracy
-
-
-# L2 NORM
-#l2_norm = tf.norm(A-B, ord='euclidean')
+    print(snr/total)
