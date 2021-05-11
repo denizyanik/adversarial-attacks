@@ -233,6 +233,9 @@ def build_dataset(path="Preproc/Train/", load_frac=1.0, batch_size=None, tile=Fa
     for idx, classname in enumerate(class_names):
         print("")
         this_Y = np.array(encode_class(classname,class_names) )
+        print(classname)
+        print(np.argmax(this_Y))
+        print("next class")
         this_Y = this_Y[np.newaxis,:]
         class_files = os.listdir(path+classname)
         shuffle(class_files)  # just to remove any special ordering

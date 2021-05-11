@@ -132,21 +132,32 @@ for i in tqdm(range(0,X_test.shape[0])):
     print(snr/total)
 '''
 
-test = librosa.feature.inverse.mel_to_audio(np.array(X_test[0].squeeze()), sr=44100)
+audio = load_melgram("C:/Users/deniz/PycharmProjects/adversarial-attacks/panotti-master/Preproc/Test/Chorus/P64-43110-3311-46225.wav.npz")
+x = np.zeros([1, 96, 173, 1])
+use_len = min(x.shape[2],audio.shape[2])
+audio = np.float32(audio[:,:,0:use_len])
+
+y = 0
+for Y in Y_test:
+    if np.argmax(Y) ==0:
+        y = Y
+
+test = librosa.feature.inverse.mel_to_audio(np.array(audio[0].squeeze()), sr=44100)
 sf.write('simba/original.wav', test, 44100)
 #imageio.imwrite('simba/original_spectrogram.png', spectrogram_to_image(X_test[0]))
 fig = spec_to_image(test)
 fig.savefig('simba/original.png')
 
-copy1 = np.copy(X_test[0:1,:,:,:])
-copy2 = np.copy(X_test[0:1,:,:,:])
-copy3 = np.copy(X_test[0:1,:,:,:])
-copy4 = np.copy(X_test[0:1,:,:,:])
-
+copy1 = np.copy(audio)
+copy2 = np.copy(audio)
+copy3 = np.copy(audio)
+copy4 = np.copy(audio)
+copy5 = np.copy(audio)
 
 
 # epsilon 0.5
-check = (SimBA_attack(model,copy4,Y_test[0],epsilon=0.2))
+check = (SimBA_attack(model,copy4,y,epsilon=0.2))
+print(np.linalg.norm(np.array(check - copy5)))
 
 c = decode_class(model.predict(check),class_names)
 
@@ -156,7 +167,8 @@ fig = spec_to_image(test)
 fig.savefig('simba/simba-0.5.png')
 
 # epsilon 0.2
-check = (SimBA_attack(model,copy1,Y_test[0],epsilon=0.2))
+check = (SimBA_attack(model,copy1,y,epsilon=0.2))
+print(np.linalg.norm(np.array(check - copy5)))
 
 c = decode_class(model.predict(check),class_names)
 
@@ -166,7 +178,8 @@ fig = spec_to_image(test)
 fig.savefig('simba/simba-0.2.png')
 
 #epsilon 0.1
-check = (SimBA_attack(model,X_test[0:1,:,:,:],Y_test[0]))
+check = (SimBA_attack(model,audio,y))
+print(np.linalg.norm(np.array(check - copy5)))
 
 c = decode_class(model.predict(check),class_names)
 
@@ -177,7 +190,8 @@ fig.savefig('simba/simba-0.1.png')
 
 #epsilon 0.05
 
-check = (SimBA_attack(model,copy2,Y_test[0],epsilon=0.05))
+check = (SimBA_attack(model,copy2,y,epsilon=0.05))
+print(np.linalg.norm(np.array(check - copy5)))
 
 c = decode_class(model.predict(check),class_names)
 
@@ -188,7 +202,8 @@ fig.savefig('simba/simba-0.05.png')
 
 # epsilon 0.01
 
-check = (SimBA_attack(model,copy3,Y_test[0],epsilon=0.01))
+check = (SimBA_attack(model,copy3,y,epsilon=0.01))
+print(np.linalg.norm(np.array(check - copy5)))
 
 c = decode_class(model.predict(check),class_names)
 

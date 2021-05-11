@@ -35,8 +35,7 @@ def calculate_snr(audio,perturbation):
     perturbation = librosa.feature.inverse.mel_to_audio(np.array(perturbation).squeeze(), sr=44100)
     audio_rms = np.mean(audio)
     perturbation_rms = np.mean(perturbation)
-    snr = 10 * math.log10((audio_rms/perturbation_rms)*(audio_rms/perturbation_rms))
-    print(snr)
+    snr = 10 * math.log10((audio_rms / perturbation_rms) * (audio_rms / perturbation_rms))
     return snr
 
 snr = 0
@@ -56,7 +55,6 @@ def fgsm(audio, label, model, epsilon = 0.1):
     gradient = tape.gradient(loss,tensor_audio)
     signed_grad = tf.sign(gradient)
     snr += calculate_snr(audio,(epsilon * signed_grad))
-    print(calculate_snr(audio,(epsilon * signed_grad)))
     return (audio + (epsilon * signed_grad))
 
 num_predictions = X_test.shape[0]
@@ -114,41 +112,55 @@ sf.write('fgsm/original.wav', test, 44100)
 fig = spec_to_image(test)
 fig.savefig('fgsm/original.png')
 
+y = 0
+for Y in Y_test:
+    if np.argmax(Y) ==0:
+        y = Y
+
 copy1 = np.copy(audio)
 copy2 = np.copy(audio)
 copy3 = np.copy(audio)
 copy4 = np.copy(audio)
+copy5 = np.copy(audio)
 
 #epsilon = 0.5
-test = np.array(fgsm(copy4,Y_test[0],model,epsilon=0.5))
+
+test = np.array(fgsm(copy4,y,model,epsilon=0.5))
+print(np.linalg.norm(np.array(test - copy5)))
+
 test = librosa.feature.inverse.mel_to_audio(test.squeeze(), sr=44100)
 sf.write('fgsm/adv-0.5.wav', test, 44100)
 fig = spec_to_image(test)
 fig.savefig('fgsm/spectrogram-0.5.png')
-print("ADSFASDF")
+
+
 #epsilon = 0.2
-test = np.array(fgsm(copy1,Y_test[0],model,epsilon=0.2))
+test = np.array(fgsm(copy1,y,model,epsilon=0.2))
+print(np.linalg.norm(np.array(test - copy5)))
 test = librosa.feature.inverse.mel_to_audio(test.squeeze(), sr=44100)
 sf.write('fgsm/adv-0.2.wav', test, 44100)
 fig = spec_to_image(test)
 fig.savefig('fgsm/spectrogram-0.2.png')
 
 #epsilon = 0.1
-test = np.array(fgsm(audio,Y_test[0],model,epsilon=0.1))
+test = np.array(fgsm(audio,y,model,epsilon=0.1))
+print(np.linalg.norm(np.array(test - copy5)))
 test = librosa.feature.inverse.mel_to_audio(test.squeeze(), sr=44100)
 sf.write('fgsm/adv-0.1.wav', test, 44100)
 fig = spec_to_image(test)
 fig.savefig('fgsm/spectrogram-0.1.png')
 
 #epsilon = 0.05
-test = np.array(fgsm(copy2,Y_test[0],model,epsilon=0.05))
+test = np.array(fgsm(copy2,y,model,epsilon=0.05))
+print(np.linalg.norm(np.array(test - copy5)))
 test = librosa.feature.inverse.mel_to_audio(test.squeeze(), sr=44100)
 sf.write('fgsm/adv-0.05.wav', test, 44100)
 fig = spec_to_image(test)
 fig.savefig('fgsm/spectrogram-0.05.png')
 
 #epsilon = 0.01
-test = np.array(fgsm(copy3,Y_test[0],model,epsilon=0.01))
+test = np.array(fgsm(copy3,y,model,epsilon=0.01))
+print(np.linalg.norm(np.array(test - copy5)))
 test = librosa.feature.inverse.mel_to_audio(test.squeeze(), sr=44100)
 sf.write('fgsm/adv-0.01.wav', test, 44100)
 fig = spec_to_image(test)

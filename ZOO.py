@@ -17,6 +17,7 @@ import soundfile as sf
 import matplotlib.pyplot as plt
 import librosa.display
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+np.set_printoptions(suppress=True)
 
 # get the data
 X_test, Y_test, paths_test, class_names = build_dataset(path="panotti-master/Preproc/Test/", batch_size=40)
@@ -31,9 +32,10 @@ snr = 0
 def calculate_snr(audio,perturbation):
     audio = librosa.feature.inverse.mel_to_audio(np.array(audio.squeeze()), sr=44100)
     perturbation = librosa.feature.inverse.mel_to_audio(np.array(perturbation).squeeze(), sr=44100)
-    audio_rms = math.sqrt(np.mean(audio**2))
-    perturbation_rms = math.sqrt(np.mean(perturbation**2))
-    snr = 10 * math.log10((audio_rms/perturbation_rms)*(audio_rms/perturbation_rms))
+    audio_rms = np.mean(audio)
+    perturbation_rms = np.mean(perturbation)
+    snr = 10 * math.log10((audio_rms / perturbation_rms) * (audio_rms / perturbation_rms))
+    print(snr)
     return snr
 
 def zoo_adam_attack_batch(xs,ys):
@@ -180,8 +182,8 @@ def zoo_adam_attack(x,y):
         x += perturbation
         snr_pert += perturbation
 
-    snr += calculate_snr(copy,snr_pert)
-    print(snr)
+    #snr += calculate_snr(copy,snr_pert)
+
     return (x)
 
 
@@ -229,6 +231,31 @@ def spec_to_image(spec):
     return fig
 
 # test single accuracy
+
+audio = load_melgram("C:/Users/deniz/PycharmProjects/adversarial-attacks/panotti-master/Preproc/Test/Chorus/P64-43110-3311-46225.wav.npz")
+x = np.zeros([1, 96, 173, 1])
+use_len = min(x.shape[2],audio.shape[2])
+audio = np.float32(audio[:,:,0:use_len])
+
+test = librosa.feature.inverse.mel_to_audio(np.array(audio[0].squeeze()), sr=44100)
+
+sf.write('zoo/original.wav', test, 44100)
+fig = spec_to_image(test)
+fig.savefig('zoo/original.png')
+
+y = 0
+for Y in Y_test:
+    if np.argmax(Y) ==0:
+        y = Y
+
+copy = np.copy(audio)
+adv = zoo_adam_attack(audio,y)
+print(np.linalg.norm(np.array(adv - copy)))
+test = librosa.feature.inverse.mel_to_audio(np.array(adv).squeeze(), sr=44100)
+sf.write('zoo/adv.wav', test, 44100)
+fig = spec_to_image(test)
+fig.savefig('zoo/adv.png')
+exit()
 
 for i in tqdm(range(0,X_test.shape[0])):
 
